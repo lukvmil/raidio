@@ -1,41 +1,57 @@
-import uberduck
-import asyncio
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
+import time
+import personality
+import utils
+from utils import spotify
+from server import app
+from threading import Thread
+from pathlib import Path
+import os
+import random
 
-from dotenv import load_dotenv
-from os import getenv
+try:
+    os.remove('start_show')
+except FileNotFoundError:
+    pass
 
-load_dotenv()
+thread = Thread(target=app.run)
+thread.start()
 
-uberduck_key = getenv('UBERDUCK_API_PUB')
-uberduck_secret = getenv('UBERDUCK_API_PK')
-spotify_id = getenv('SPOTIFY_CLIENT_ID')
-spotify_secret = getenv('SPOTIFY_CLIENT_SECRET')
-spotify_redirect = 'http://127.0.0.1:5000/callback'
-scopes = [
-    'user-read-playback-state',
-    'user-modify-playback-state',
-    'user-read-currently-playing'
+while not Path('start_show').is_file():
+    time.sleep(1)
 
-]
+queue = spotify.queue()
+first_song = utils.process_song(queue['currently_playing'])
 
-# with open('token.txt', 'r') as f:
-#     token = f.read()
+text = personality.welcome(first_song)
+utils.generate_voice(text)
 
+utils.pause()
+spotify.seek_track(0)
+utils.play_temp_file()
+utils.resume()
 
-#     sp = spotipy.Spotify(token)
+prev_song = first_song
 
-#     print(sp.current_user_playing_track())
+while True:
+    time_remaining = utils.song_time_remaining()
+    # print(f'{time_remaining} seconds left in current song')
 
+    if time_remaining < 20:
+        next_song = utils.get_next_song()
 
-client = uberduck.UberDuck(uberduck_key, uberduck_secret)
-voices = uberduck.get_voices(return_only_names=True)
+        if random.randint(0, 3) == 0:
+            text = personality.story(prev_song)
+        else:
+            text = personality.reminder(prev_song, next_song)
 
-text = """
-Up next is "Dynamite" by BTS. This one is a bright and upbeat track with a feel-good vibe that will lift your spirits. It's a song about finding strength and self-confidence, and it's sure to put a smile on your face! So get ready to dance, because this one is going to be a banger!
-"""
+        prev_song = next_song
+        utils.generate_voice(text)
 
-sound = client.speak(text, "simon-cowell")
+        time_remaining = utils.song_time_remaining()
+        time.sleep(time_remaining)
 
-import pdb; pdb.set_trace()
+        utils.pause()
+        utils.play_temp_file()
+        utils.resume()
+
+    time.sleep(5)

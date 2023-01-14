@@ -1,5 +1,6 @@
-from flask import Flask, request
 import spotipy
+from multiprocessing import Process
+from flask import Flask, request
 from spotipy import oauth2
 from dotenv import load_dotenv
 from os import getenv
@@ -8,24 +9,18 @@ load_dotenv()
 
 spotify_id = getenv('SPOTIFY_CLIENT_ID')
 spotify_secret = getenv('SPOTIFY_CLIENT_SECRET')
-spotify_redirect = 'http://127.0.0.1:5000/callback'
+spotify_redirect = 'http://127.0.0.1:5000/'
 scopes = [
     'user-read-playback-state',
     'user-modify-playback-state',
     'user-read-currently-playing'
-
 ]
-cache = '.spotipyoauthcache'
 
 app = Flask('raidio')
 
 sp_oauth = oauth2.SpotifyOAuth(spotify_id, spotify_secret, spotify_redirect, scope=scopes)
 
 @app.route('/')
-def hello_world():
-    return 'hello world'
-
-@app.route('/callback')
 def callback():
     access_token = ""
 
@@ -46,22 +41,15 @@ def callback():
         print("Access token available! Trying to get user information...")
         sp = spotipy.Spotify(access_token)
         results = sp.current_user()
-        queue = sp.queue()
-        print(queue)
-        with open('token.txt', 'w+') as f:
-            f.write(access_token)
-        return results
+
+        return f"Welcome {results['display_name']}, <a href='/start'>click here to start the show!</a>"
 
     else:
-        return htmlForLoginButton()
+        return f"<a href='{sp_oauth.get_authorize_url()}'>Login to Spotify</a>"
 
-def htmlForLoginButton():
-    auth_url = getSPOauthURI()
-    htmlLoginButton = "<a href='" + auth_url + "'>Login to Spotify</a>"
-    return htmlLoginButton
+@app.route('/start')
+def start():
+    with open('start_show', 'w') as f:
+        pass
 
-def getSPOauthURI():
-    auth_url = sp_oauth.get_authorize_url()
-    return auth_url
-
-app.run()
+    return "The show has started! Feel free to close this window."
